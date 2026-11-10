@@ -1,5 +1,8 @@
 # =============================================================================
-# CommunicationPet 后端依赖
+# CommunicationPet 后端依赖（独立 Python 3.11 环境使用）
+#
+# 注意：如果你直接复用 GPT-SoVITS 的 runtime，不要安装本文件；
+# 该 runtime 已包含所需依赖，安装本文件可能升级 funasr/torch 并破坏 GPT-SoVITS。
 #
 # LLM 使用 OpenAI 兼容的远程 API（llm-module 走标准库 urllib），
 # TTS 使用外部 GPT-SoVITS api_v2 服务，因此不需要本地 LLM/TTS 权重。

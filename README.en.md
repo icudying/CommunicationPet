@@ -36,9 +36,14 @@ git lfs pull
 Put GPT-SoVITS at `vendor/GPT-SoVITS` (or set `MINIMIND_GSV_ROOT`), then:
 
 ```powershell
-runtime\python.exe -m pip install -r requirements.txt   # from the GPT-SoVITS runtime
-python setup_assets.py                                  # downloads the VAD model
+python setup_assets.py   # downloads the VAD model
 ```
+
+The GPT-SoVITS runtime already ships with the backend dependencies (`fastapi`,
+`uvicorn`, `websockets`, `numpy`, `funasr`, `torch`, `onnxruntime`). **Do not**
+install `requirements.txt` into that runtime; it may upgrade `funasr`/`torch`
+to versions incompatible with GPT-SoVITS. `requirements.txt` is only for a
+separate Python 3.11 environment, in which case set `MINIMIND_PYTHON`.
 
 Configure the LLM key either in **Settings → LLM** or with environment variables:
 

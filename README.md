@@ -77,20 +77,25 @@ $env:MINIMIND_GSV_ROOT = "D:\GPT-SoVITS"
 
 确认存在 `runtime\python.exe` 与 `tools\asr\models\speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch`。
 
-### 3. 安装 Python 依赖
+### 3. 准备 Python 依赖
 
-```powershell
-# 推荐用 GPT-SoVITS 的 runtime，省掉重复安装 torch
-& "$env:MINIMIND_GSV_ROOT\runtime\python.exe" -m pip install -r requirements.txt
-```
+**推荐直接复用 GPT-SoVITS 的 runtime**。它已经包含后端需要的 `fastapi`、`uvicorn`、`websockets`、`numpy`、`funasr`、`torch`、`onnxruntime` 等依赖，启动脚本只会补装一个 `eval_type_backport`（Python 3.9 类型注解补丁）。
 
-如果你使用自己的 Python 环境：
+> 不要把 `requirements.txt` 安装进 GPT-SoVITS 的 runtime，否则可能把 `funasr`/`torch` 升级到与 GPT-SoVITS 不兼容的版本。
+
+如果你坚持使用自己的 Python 3.11 环境：
 
 ```powershell
 conda create -n communicationpet python=3.11 -y
 conda activate communicationpet
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+```
+
+然后设置 `MINIMIND_PYTHON` 指向该环境的 `python.exe`，并确认 CUDA 版 PyTorch 可用：
+
+```powershell
+python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 ```
 
 ### 4. 准备 VAD 模型
@@ -105,7 +110,7 @@ python setup_assets.py
 
 两种方式任选其一：
 
-- 启动应用后，在右上角 **Settings → LLM** 填入 API Key、Base URL、模型名；
+- 启动应用后，在右上角 **Settings → LLM** 填入 API Key、Base URL、模型名；保存后重新开始语音会话生效；
 - 或使用环境变量：
 
 ```powershell
