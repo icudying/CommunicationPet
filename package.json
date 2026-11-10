@@ -1,0 +1,10 @@
+{
+  "name": "communicationpet",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix electron-app",
+    "setup:assets": "python setup_assets.py",
+    "verify:assets": "python setup_assets.py --verify"
+  }
+}

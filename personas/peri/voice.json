@@ -1,0 +1,13 @@
+{
+  "id": "peri",
+  "name": "佩莉 Peri",
+  "source": "原创角色",
+  "skill_file": "SKILL.md",
+  "ref_audio_path": "reference.wav",
+  "prompt_text": "管理员，我会继续努力的，作为监督。",
+  "prompt_lang": "zh",
+  "text_lang": "zh",
+  "address_as": "你",
+  "gpt_weights_path": "weights/gpt.ckpt",
+  "sovits_weights_path": "weights/sovits.pth"
+}

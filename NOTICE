@@ -1,0 +1,19 @@
+CommunicationPet
+Copyright 2026 CommunicationPet contributors
+
+This product includes software developed by the Whispera project,
+licensed under the Apache License, Version 2.0.
+
+This product includes software developed by the mem0 project
+(https://github.com/mem0ai/mem0), licensed under the Apache License,
+Version 2.0.
+
+This product depends on GPT-SoVITS (https://github.com/RVC-Boss/GPT-SoVITS),
+licensed under the MIT License.
+
+This product uses the Silero VAD model (https://github.com/snakers4/silero-vad),
+licensed under the MIT License.
+
+Character names, voice samples and fine-tuned voice weights under personas/
+are third-party assets and are NOT covered by this project's Apache-2.0
+license. See THIRD_PARTY_NOTICES.md for details.

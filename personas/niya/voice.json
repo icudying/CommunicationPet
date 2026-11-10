@@ -1,0 +1,12 @@
+{
+  "id": "niya",
+  "name": "妮娅 Niya",
+  "source": "原创角色",
+  "skill_file": "SKILL.md",
+  "ref_audio_path": "reference.wav",
+  "prompt_text": "怎么啊？如果有你在也不放心，那就干脆给我也装个限制器或者炸弹喽。",
+  "prompt_lang": "zh",
+  "text_lang": "zh",
+  "gpt_weights_path": "weights/gpt.ckpt",
+  "sovits_weights_path": "weights/sovits.pth"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "communicationpet-desktop",
+  "productName": "CommunicationPet",
+  "version": "0.1.0",
+  "description": "Desktop frontend for a local realtime voice companion.",
+  "private": true,
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "three": "^0.179.1"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7"
+  }
+}

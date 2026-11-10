@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CommunicationPet</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="scene-backdrop" id="sceneBackdrop" aria-hidden="true"></div>
+
+  <!--
+    化身层：内嵌 化身服务 的 VRM 渲染页，与 scene-backdrop 同为全窗口背景层，
+    两者互斥显示（由 body.avatar-mode 切换）。
+    <webview> 由 app.js 在进入化身模式时用「显式像素尺寸」创建 —— 它不吃百分比
+    尺寸，用 % 或默认尺寸会让 guest 的视口卡在 150px 高。preload 由主进程在
+    will-attach-webview 里注入，src 也只允许指向本机化身服务。
+  -->
+  <div class="avatar-stage" id="avatarStage" aria-hidden="true">
+    <div class="avatar-stage__hint" id="avatarStageHint">正在加载化身…</div>
+  </div>
+  <div class="app-frame">
+    <header class="window-bar" aria-label="Window controls">
+      <div class="window-brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>CommunicationPet</span>
+      </div>
+      <div class="window-actions">
+        <div class="session-stages" aria-label="Conversation status">
+          <div class="stage-pill header-stage" id="userStage">User Idle</div>
+          <div class="stage-pill header-stage" id="assistantStage">AI Idle</div>
+        </div>
+        <div class="persona-picker" role="group" aria-label="人格切换">
+          <span class="persona-picker__label">人格</span>
+          <select id="personaSelect" class="persona-select" aria-label="切换人格" disabled>
+            <option value="">加载中…</option>
+          </select>
+        </div>
+        <div class="persona-picker" role="group" aria-label="角色模型切换">
+          <span class="persona-picker__label">模型</span>
+          <select id="avatarModelSelect" class="persona-select" aria-label="切换角色模型" disabled>
+            <option value="">加载中…</option>
+          </select>
+        </div>
+        <div class="status-pill status-pill--idle" id="backendState">Backend Offline</div>
+        <nav class="tool-dock" aria-label="Tool panels">
+          <button class="tool-tab" id="settingsTab" type="button" data-panel-target="settings" aria-pressed="false" aria-label="Settings" title="设置">
+            <svg class="tool-tab__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.54h.08A1.7 1.7 0 0 0 10.11 3v-.09a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"></path>
+            </svg>
+            <span class="tool-tab__label">Settings</span>
+          </button>
+          <button class="tool-tab" id="logsTab" type="button" data-panel-target="logs" aria-pressed="false" aria-label="Logs" title="日志">
+            <svg class="tool-tab__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <path d="M14 2v6h6"></path>
+              <path d="M16 13H8"></path>
+              <path d="M16 17H8"></path>
+              <path d="M10 9H8"></path>
+            </svg>
+            <span class="tool-tab__label">Logs</span>
+          </button>
+          <button class="tool-tab" id="datasetTab" type="button" data-panel-target="dataset" aria-pressed="false" aria-label="Dataset" title="数据集">
+            <svg class="tool-tab__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <ellipse cx="12" cy="5" rx="8" ry="3"></ellipse>
+              <path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path>
+              <path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"></path>
+            </svg>
+            <span class="tool-tab__label">Dataset</span>
+          </button>
+          <button class="tool-tab" id="historyTab" type="button" data-panel-target="history" aria-pressed="false" aria-label="History" title="历史记录">
+            <svg class="tool-tab__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+              <path d="M3 4v5h5"></path>
+              <path d="M12 7v5l3 2"></path>
+            </svg>
+            <span class="tool-tab__label">History</span>
+          </button>
+          <button class="tool-tab" id="statusTab" type="button" data-panel-target="status" aria-pressed="false" aria-label="Status" title="状态">
+            <svg class="tool-tab__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+            </svg>
+            <span class="tool-tab__label">Status</span>
+          </button>
+        </nav>
+        <button class="win-btn" id="minBtn" type="button" aria-label="Minimize">-</button>
+        <button class="win-btn" id="maxBtn" type="button" aria-label="Maximize">[]</button>
+        <button class="win-btn win-btn--danger" id="closeBtn" type="button" aria-label="Close">x</button>
+      </div>
+    </header>
+
+    <main class="chat-layout">
+      <section class="side-console" aria-label="Assistant tools">
+        <div class="tool-panel tool-panel--hidden" id="toolPanel">
+          <section class="tool-view" id="settingsPanel" data-panel-view="settings" aria-labelledby="settingsTab">
+            <div class="tool-view__header">
+              <p class="panel-kicker">Settings</p>
+              <h2>LLM 设置</h2>
+            </div>
+
+            <div class="voice-form llm-form">
+              <div class="llm-mode-switch" role="tablist" aria-label="LLM 运行模式">
+                <button class="llm-mode-btn is-active" id="llmModeLocalBtn" type="button" role="tab" aria-selected="true">本地 GGUF</button>
+                <button class="llm-mode-btn" id="llmModeApiBtn" type="button" role="tab" aria-selected="false">API 接口</button>
+              </div>
+
+              <div id="llmLocalPanel" class="llm-mode-panel">
+                <label class="field">
+                  <span>模型文件</span>
+                  <div class="file-picker-row">
+                    <input id="llmModelPath" type="text" placeholder="选择 GGUF 模型文件..." readonly>
+                    <button class="ghost-btn compact-btn file-picker-btn" id="browseModelBtn" type="button">浏览...</button>
+                  </div>
+                </label>
+                <div class="llm-model-info" id="llmModelInfo">
+                  <span class="llm-model-name" id="llmModelName">未选择模型</span>
+                  <span class="llm-model-size" id="llmModelSize"></span>
+                </div>
+              </div>
+
+              <div id="llmApiPanel" class="llm-mode-panel" hidden>
+                <label class="field">
+                  <span>请求地址</span>
+                  <input id="llmApiBaseUrl" type="text" placeholder="https://api.openai.com 或 .../v1" autocomplete="off" spellcheck="false">
+                </label>
+                <label class="field">
+                  <span>API Key</span>
+                  <input id="llmApiKey" type="password" placeholder="可选，本地明文存储" autocomplete="off" spellcheck="false">
+                </label>
+                <label class="field">
+                  <span>模型名</span>
+                  <input id="llmApiModel" type="text" placeholder="例如 gpt-4o-mini / deepseek-chat" autocomplete="off" spellcheck="false">
+                </label>
+                <div class="voice-status">地址末尾有无 /v1 均可；下游会自动补齐。模型名需手动填写。</div>
+              </div>
+
+              <button class="primary-btn compact-btn" id="applyLlmBtn" type="button">应用 LLM 配置</button>
+              <div class="voice-status" id="llmStatus">请选择一个 GGUF 格式的大语言模型文件。</div>
+            </div>
+
+            <div class="tool-view__header" style="margin-top: 24px;">
+              <p class="panel-kicker">Settings</p>
+              <h2>话痨程度</h2>
+            </div>
+
+            <div class="voice-form">
+              <div class="talkativeness">
+                <div class="talkativeness__head">
+                  <span class="talkativeness__current" id="talkativenessLabel">普通</span>
+                  <span class="talkativeness__hint" id="talkativenessHint">默认回复长度</span>
+                </div>
+                <div class="talkativeness__slider">
+                  <input id="talkativenessRange" class="talkativeness__range" type="range" min="1" max="5" step="1" value="3" aria-label="话痨程度">
+                </div>
+                <div class="talkativeness__stops" role="presentation">
+                  <button class="talkativeness__stop" type="button" data-level="1" aria-label="极简">极简</button>
+                  <button class="talkativeness__stop" type="button" data-level="2" aria-label="简洁">简洁</button>
+                  <button class="talkativeness__stop is-active" type="button" data-level="3" aria-label="普通">普通</button>
+                  <button class="talkativeness__stop" type="button" data-level="4" aria-label="健谈">健谈</button>
+                  <button class="talkativeness__stop" type="button" data-level="5" aria-label="话痨">话痨</button>
+                </div>
+              </div>
+              <div class="voice-status" id="talkativenessStatus">从左到右滑动，AI 回复越来越长。当前为普通，下一轮对话立即生效。</div>
+            </div>
+
+            <div class="tool-view__header" style="margin-top: 24px;">
+              <p class="panel-kicker">Settings</p>
+              <h2>TTS 设置</h2>
+            </div>
+
+            <div class="voice-status" style="margin-bottom: 8px;">音色通常由顶部「人格」切换器自动设定（参考音频 + 提示文本）。下方字段仅作手动覆盖，留空即沿用当前人格。</div>
+
+            <div class="voice-form">
+              <label class="field" hidden>
+                <span>模型版本</span>
+                <select id="ttsModelVersion">
+                  <option value="1.5">VoxCPM 1.5(~6G)</option>
+                  <option value="2">VoxCPM 2(~9G)</option>
+                </select>
+              </label>
+              <label class="field" hidden>
+                <span>LoRA</span>
+                <select id="ttsLoraSelect">
+                  <option value="">Base voice</option>
+                </select>
+              </label>
+              <button class="ghost-btn compact-btn" id="refreshLoraBtn" type="button" hidden>Refresh LoRA</button>
+              <label class="field">
+                <span>Reference Audio Path</span>
+                <div class="file-picker-row">
+                  <input id="promptAudioPath" type="text" placeholder="Optional local wav/mp3 path">
+                  <button class="ghost-btn compact-btn file-picker-btn" id="browseAudioBtn" type="button">浏览...</button>
+                </div>
+              </label>
+              <label class="field">
+                <span>Reference Text</span>
+                <textarea id="promptText" placeholder="Required when reference audio is used"></textarea>
+              </label>
+              <div class="param-row" hidden>
+                <label class="field">
+                  <span>CFG</span>
+                  <input id="ttsCfgValue" type="number" min="0.1" max="10" step="0.1" value="2.0">
+                </label>
+                <label class="field">
+                  <span>Steps</span>
+                  <input id="ttsInferenceTimesteps" type="number" min="1" max="100" step="1" value="10">
+                </label>
+                <label class="field">
+                  <span>Seed</span>
+                  <input id="ttsSeed" type="number" step="1" value="-1">
+                </label>
+              </div>
+              <button class="primary-btn compact-btn" id="applyTtsBtn" type="button">Apply TTS</button>
+              <div class="voice-status" id="ttsStatus">参考音频与提示文本需同时填写；留空则使用当前人格音色。</div>
+            </div>
+
+            <div class="tool-view__header" style="margin-top: 24px;">
+              <p class="panel-kicker">Settings</p>
+              <h2>资源目录</h2>
+            </div>
+
+            <div class="voice-form">
+              <label class="field">
+                <span>Assets 文件夹</span>
+                <div class="file-picker-row">
+                  <input id="assetsRootPath" type="text" placeholder="默认使用程序目录下的 assets" readonly>
+                  <button class="ghost-btn compact-btn file-picker-btn" id="browseAssetsRootBtn" type="button">浏览...</button>
+                </div>
+              </label>
+              <button class="ghost-btn compact-btn" id="resetAssetsRootBtn" type="button">恢复默认目录</button>
+              <div class="voice-status" id="assetsRootStatus">正在读取资源目录...</div>
+            </div>
+          </section>
+
+          <section class="tool-view tool-view--logs" id="logsPanel" data-panel-view="logs" aria-labelledby="logsTab" hidden>
+            <div class="tool-view__header tool-view__header--tight">
+              <p class="panel-kicker">Logs</p>
+              <h2>运行日志</h2>
+            </div>
+            <div class="log-actions" aria-label="Log actions">
+              <label class="log-capture-control" for="logCaptureToggle">
+                <span class="log-capture-copy">
+                  <strong>Capture service logs and user turns</strong>
+                  <span class="voice-status" id="logCaptureHint">Capture is off. No service logs or per-turn user audio/transcripts are being written.</span>
+                </span>
+                <span class="log-switch">
+                  <input id="logCaptureToggle" type="checkbox" role="switch" aria-label="Enable service log and turn capture">
+                  <span class="log-switch__track" aria-hidden="true"></span>
+                </span>
+              </label>
+              <button class="ghost-btn compact-btn service-log-folder-btn" id="openServiceLogsBtn" type="button">打开服务日志目录</button>
+            </div>
+            <div class="log" id="eventLog" aria-live="polite"></div>
+          </section>
+
+          <section class="tool-view" id="datasetPanel" data-panel-view="dataset" aria-labelledby="datasetTab" hidden>
+            <div class="tool-view__header">
+              <p class="panel-kicker">Dataset</p>
+              <h2>数据集</h2>
+            </div>
+            <div class="empty-state">
+              <strong>Dataset panel placeholder</strong>
+              <span>这里先保留入口，后续接入数据集管理。</span>
+            </div>
+          </section>
+
+          <section class="tool-view" id="historyPanel" data-panel-view="history" aria-labelledby="historyTab" hidden>
+            <div class="tool-view__header tool-view__header--tight">
+              <p class="panel-kicker">History</p>
+              <h2>历史记录</h2>
+            </div>
+
+            <div class="history-toolbar">
+              <button class="ghost-btn compact-btn" id="historyRefreshBtn" type="button">刷新</button>
+              <button class="ghost-btn compact-btn" id="historySyncBtn" type="button">同步文件改动</button>
+              <button class="ghost-btn compact-btn" id="historyOpenVaultBtn" type="button">打开目录</button>
+            </div>
+
+            <div id="historyVaultBlock">
+              <label class="field">
+                <span>Markdown 目录（可直接编辑/删除）</span>
+                <div class="file-picker-row">
+                  <input id="historyVaultPath" type="text" readonly placeholder="读取中...">
+                  <button class="ghost-btn compact-btn file-picker-btn" id="browseHistoryVaultBtn" type="button">选择...</button>
+                </div>
+              </label>
+              <div class="voice-status" id="historyVaultStatus">正在读取目录...</div>
+            </div>
+
+            <div class="llm-mode-switch history-tabs" role="tablist" aria-label="历史记录类型">
+              <button class="llm-mode-btn is-active" id="historySessionsTab" type="button" role="tab" aria-selected="true">会话</button>
+              <button class="llm-mode-btn" id="historyMemoriesTab" type="button" role="tab" aria-selected="false">长期记忆</button>
+              <button class="llm-mode-btn" id="historyDatabaseTab" type="button" role="tab" aria-selected="false">数据库</button>
+            </div>
+
+            <label class="history-show-deleted" id="historyShowDeletedRow">
+              <input id="historyShowDeleted" type="checkbox">
+              <span>显示已删除（可恢复）</span>
+            </label>
+
+            <div class="voice-status" id="historyStatus">等待后端连接…</div>
+
+            <div class="history-body" id="historyBody"></div>
+          </section>
+
+          <section class="tool-view" id="statusPanel" data-panel-view="status" aria-labelledby="statusTab" hidden>
+            <div class="tool-view__header">
+              <p class="panel-kicker">Status</p>
+              <h2>当前状态</h2>
+            </div>
+
+            <!-- <button class="ghost-btn compact-btn" id="pingBtn" type="button">Ping Backend</button> -->
+
+            <dl class="kv">
+              <div>
+                <dt>HTTP</dt>
+                <dd id="httpBase">-</dd>
+              </div>
+              <div>
+                <dt>WebSocket</dt>
+                <dd id="wsUrl">-</dd>
+              </div>
+              <div>
+                <dt>App Version</dt>
+                <dd id="appVersion">-</dd>
+              </div>
+            </dl>
+
+            <section class="status-section" aria-label="Resource status">
+              <div class="status-section__header">
+                <div>
+                  <p class="status-section__kicker">Resources</p>
+                  <h3 class="status-section__title">Local Assets</h3>
+                </div>
+                <button class="ghost-btn compact-btn status-detect-btn" id="detectResourcesBtn" type="button">Detect Resources</button>
+              </div>
+
+              <div class="resource-grid">
+                <div class="resource-item">
+                  <span class="resource-item__name">Llama Runtime</span>
+                  <span class="resource-badge" id="resourceLlamaState">Checking</span>
+                </div>
+                <div class="resource-item">
+                  <span class="resource-item__name">GGUF</span>
+                  <span class="resource-badge" id="resourceGgufState">Checking</span>
+                </div>
+                <div class="resource-item">
+                  <span class="resource-item__name">ASR</span>
+                  <span class="resource-badge" id="resourceAsrState">Checking</span>
+                </div>
+                <div class="resource-item">
+                  <span class="resource-item__name">TTS</span>
+                  <span class="resource-badge" id="resourceTtsState">Checking</span>
+                </div>
+              </div>
+
+              <div class="resource-hint" id="resourceHint">Checking installation assets...</div>
+            </section>
+
+            <!--
+            <div class="orb-wrap">
+              <div class="orb" id="orb" aria-hidden="true">
+                <div class="orb__core"></div>
+                <div class="orb__ring orb__ring--one"></div>
+                <div class="orb__ring orb__ring--two"></div>
+              </div>
+              <div class="orb-caption" id="orbCaption">Awaiting backend connection</div>
+            </div>
+
+            <div class="flow-status" aria-label="Realtime turn status">
+              <div class="flow-step" id="flowListening">
+                <span class="flow-step__dot"></span>
+                <strong>Listening</strong>
+              </div>
+              <div class="flow-step" id="flowSpeechEnd">
+                <span class="flow-step__dot"></span>
+                <strong>Speech End</strong>
+              </div>
+              <div class="flow-step" id="flowAsr">
+                <span class="flow-step__dot"></span>
+                <strong>ASR</strong>
+              </div>
+              <div class="flow-step" id="flowLlm">
+                <span class="flow-step__dot"></span>
+                <strong>LLM</strong>
+              </div>
+            </div>
+            -->
+          </section>
+        </div>
+      </section>
+
+      <section class="session-console" aria-label="Voice and text controls">
+        <form class="text-composer" id="textComposer" aria-label="Text input placeholder">
+          <input id="textPromptInput" type="text" placeholder="请先启动服务" autocomplete="off">
+          <button class="send-btn" id="sendTextBtn" type="submit" aria-label="Send text message">
+            <svg class="send-btn__icon send-btn__icon--stroke" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 11.5 20 4l-6.5 16-3-6.5z"></path>
+              <path d="M10.5 13.5 20 4"></path>
+            </svg>
+          </button>
+        </form>
+      </section>
+
+      <section class="conversation" aria-label="Conversation">
+        <div class="conversation__scroll" id="conversationScroll"></div>
+        <div class="conversation__actions">
+          <div class="call-controls" aria-label="Voice session controls">
+            <button class="call-btn call-btn--start" id="connectBtn" type="button" aria-label="Start Voice Session">
+              <svg class="call-btn__icon call-btn__icon--stroke" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 5.5 19 12 8 18.5z"></path>
+              </svg>
+            </button>
+            <button class="call-btn call-btn--microphone is-active" id="microphoneBtn" type="button" aria-label="关闭麦克风" aria-pressed="true" title="麦克风已开启">
+              <svg class="call-btn__icon call-btn__icon--stroke" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z"></path>
+                <path d="M5.5 11.5v.5a6.5 6.5 0 0 0 13 0v-.5M12 18.5V22M9 22h6"></path>
+                <path class="call-btn__mic-slash" d="M5 4 19 20"></path>
+              </svg>
+            </button>
+            <button class="call-btn call-btn--stop" id="disconnectBtn" type="button" aria-label="Stop Voice Session" disabled>
+              <svg class="call-btn__icon call-btn__icon--stroke" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="7" y="7" width="10" height="10" rx="2"></rect>
+              </svg>
+            </button>
+            <button class="call-btn call-btn--clear" id="clearContextBtn" type="button" aria-label="Clear Conversation" disabled>
+              <svg class="call-btn__icon call-btn__icon--stroke" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16"></path>
+                <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+                <path d="M6 7l1 13h10l1-13"></path>
+                <path d="M10 11v6"></path>
+                <path d="M14 11v6"></path>
+              </svg>
+            </button>
+            <button class="call-btn call-btn--avatar" id="avatarBtn" type="button" aria-label="显示角色" aria-pressed="false" title="显示角色，替换能量球" disabled>
+              <svg class="call-btn__icon call-btn__icon--stroke" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="8.4" r="3.6"></circle>
+                <path d="M4.8 20.2a7.4 7.4 0 0 1 14.4 0"></path>
+              </svg>
+            </button>
+            <button class="call-btn call-btn--framing" id="framingBtn" type="button" aria-label="切换取景" aria-pressed="false" title="切换为上半身取景" disabled>
+              <svg class="call-btn__icon call-btn__icon--stroke" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3.5" y="4" width="17" height="16" rx="2.5"></rect>
+                <path d="M8 20v-5.5h8V20"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./scene.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
